@@ -7,8 +7,11 @@ import AmaalForm from './components/AmaalForm';
 import StatsDashboard from './components/StatsDashboard';
 import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from './components/RemindersManager';
 import { 
-  Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2
+  Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
+  LogIn, LogOut, User as UserIcon, Crown
 } from 'lucide-react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, signInWithGoogle, logoutUser } from './firebase';
 
 // Helper to safely get local date string YYYY-MM-DD
 const getLocalDateString = (d: Date = new Date()) => {
@@ -84,6 +87,38 @@ export default function App() {
   const [works, setWorks] = useState<DailyWork[]>([]);
   const [history, setHistory] = useState<Record<string, string[]>>({});
   const [streak, setStreak] = useState<number>(0);
+
+  // Authentication State
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(true);
+  const [signInError, setSignInError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    setSignInError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      setSignInError(err?.message || "فشل تسجيل الدخول باستخدام غوغل");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (err: any) {
+      console.error("Logout Err:", err);
+    }
+  };
+
+  const isAdminUser = user?.email === 'basim5252@gmail.com';
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
@@ -499,15 +534,67 @@ export default function App() {
               </p>
             </div>
 
-            {/* Live Clock & Badge Stats */}
-            <div className="flex items-center gap-3 self-end sm:self-center">
-              <div className="bg-emerald-900/60 border border-emerald-800 p-2.5 rounded-xl text-left font-mono text-xs flex items-center gap-2 shadow-inner text-emerald-200">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>{currentTime || '00:00:00'}</span>
-              </div>
-              <div className="bg-amber-400 text-emerald-950 px-3 py-2 rounded-xl shadow-md font-bold text-xs flex items-center gap-1.5">
-                <Award className="w-4 h-4 fill-emerald-950" />
-                <span>الالتزام: {streak} يوم</span>
+            {/* Live Clock, Badge Stats & Google Auth Card */}
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 self-end sm:self-center">
+              {/* Authenticated User or Sign in button */}
+              {authLoading ? (
+                <div className="h-9 w-24 rounded-xl bg-emerald-900/30 animate-pulse border border-emerald-850" />
+              ) : user ? (
+                <div className="bg-emerald-900/40 border border-emerald-800/80 rounded-xl px-3 py-1.5 flex items-center gap-2.5 shadow-md">
+                  {user.photoURL ? (
+                    <img 
+                      src={user.photoURL} 
+                      alt={user.displayName || 'User'} 
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-lg border border-amber-400/30 object-cover"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-lg bg-amber-400 text-emerald-950 flex items-center justify-center font-bold text-xs">
+                      <UserIcon className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                  
+                  <div className="text-right">
+                    <div className="text-[10px] text-stone-200 font-bold max-w-[110px] truncate">
+                      {user.displayName || user.email?.split('@')[0]}
+                    </div>
+                    {isAdminUser ? (
+                      <span className="text-[9px] text-amber-300 font-extrabold flex items-center gap-0.5">
+                        <Crown className="w-2.5 h-2.5 fill-amber-300 animate-pulse" />
+                        <span>المدير 👑</span>
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-emerald-300 font-sans">مُسجّل</span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleLogout}
+                    className="p-1 bg-emerald-950 hover:bg-emerald-800 rounded-lg text-emerald-300 hover:text-white transition-all cursor-pointer mr-1"
+                    title="تسجيل الخروج"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGoogleLogin}
+                  className="px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-300 hover:from-amber-300 hover:to-amber-200 active:scale-95 text-emerald-950 font-serif font-black rounded-xl transition-all shadow-md text-xs flex items-center gap-1.5 cursor-pointer border border-amber-400/25"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>دخول بجوجل</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-900/60 border border-emerald-800 p-2.5 rounded-xl text-left font-mono text-xs flex items-center gap-2 shadow-inner text-emerald-200">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{currentTime || '00:00:00'}</span>
+                </div>
+                <div className="bg-amber-400 text-emerald-950 px-3 py-2 rounded-xl shadow-md font-bold text-xs flex items-center gap-1.5 font-sans">
+                  <Award className="w-4 h-4 fill-emerald-950" />
+                  <span>الالتزام: {streak} يوم</span>
+                </div>
               </div>
             </div>
           </div>
@@ -640,6 +727,7 @@ export default function App() {
                 setIsFormOpen(true);
               }}
               selectedDateStr={selectedDateStr}
+              isAdminUser={isAdminUser}
             />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 

@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin Configuration",
+      "description": "Information about authorized administrators",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Authorized administrator email address"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Collection of bootstrap admins to enforce premium features access control"
+    }
+  }
+}

@@ -12,6 +12,7 @@ interface AmaalListProps {
   onSelectWork: (work: DailyWork) => void;
   onOpenAddModal: () => void;
   selectedDateStr: string;
+  isAdminUser?: boolean;
 }
 
 const TIMES: { label: string; value: AmaalTime | 'الكل'; icon?: any }[] = [
@@ -75,7 +76,8 @@ export default function AmaalList({
   onToggleComplete, 
   onSelectWork, 
   onOpenAddModal,
-  selectedDateStr
+  selectedDateStr,
+  isAdminUser = false
 }: AmaalListProps) {
   const [search, setSearch] = useState('');
   const [timeFilter, setTimeFilter] = useState<AmaalTime | 'الكل'>('الكل');
@@ -799,20 +801,22 @@ export default function AmaalList({
               </div>
 
               {/* 📱 Android Emulator Style Export Action Bar */}
-              <div className="mt-4 pt-4 border-t border-emerald-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-950/40 px-4 py-3 -mx-5 -mb-5 rounded-b-3xl">
-                <span className="text-[10px] text-emerald-300 font-sans flex items-center gap-1.5 font-medium">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  <span>تصدير فوري للموجز بـطابع ومحاكي أندرويد الأنيق بنفس الألوان لمشاركته.</span>
-                </span>
-                
-                <button
-                  id="export-outline-image-btn"
-                  onClick={handleExportAsImage}
-                  className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-emerald-950 font-serif font-black rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center gap-1.5 w-full sm:w-auto justify-center"
-                >
-                  <span>تصدير كصورة محاكي آندرويد 📱</span>
-                </button>
-              </div>
+              {isAdminUser && (
+                <div className="mt-4 pt-4 border-t border-emerald-900/40 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-950/40 px-4 py-3 -mx-5 -mb-5 rounded-b-3xl">
+                  <span className="text-[10px] text-emerald-300 font-sans flex items-center gap-1.5 font-medium">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>تصدير فوري للموجز بـطابع ومحاكي أندرويد الأنيق بنفس الألوان لمشاركته. <span className="text-amber-300 font-extrabold">(خاص بالمدير 👑)</span></span>
+                  </span>
+                  
+                  <button
+                    id="export-outline-image-btn"
+                    onClick={handleExportAsImage}
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-emerald-950 font-serif font-black rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center gap-1.5 w-full sm:w-auto justify-center"
+                  >
+                    <span>تصدير كصورة محاكي آندرويد 📱</span>
+                  </button>
+                </div>
+              )}
 
             </div>
           )}
