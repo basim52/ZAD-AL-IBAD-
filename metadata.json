@@ -1,0 +1,6 @@
+{
+  "name": "Daily Amaal Tracker",
+  "description": "An elegant tracker for daily Islamic devotions, supplications, prayers, and visitations with built-in text readers and completion history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
