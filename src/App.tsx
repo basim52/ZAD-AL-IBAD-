@@ -236,6 +236,25 @@ export default function App() {
     });
   };
 
+  // Helper to format Hijri date
+  const formatHijriDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      const formatted = formatter.format(date);
+      if (formatted && !formatted.includes('هـ')) {
+        return `${formatted} هـ`;
+      }
+      return formatted;
+    } catch {
+      return '';
+    }
+  };
+
   const isTodaySelected = selectedDateStr === getLocalDateString();
 
   return (
@@ -253,15 +272,20 @@ export default function App() {
           {/* Main Titles */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <span className="p-1 rounded bg-amber-400/20 border border-amber-400/35 text-amber-400 text-[10px] font-mono tracking-wider font-extrabold px-2 uppercase">
-                  Zad Al-Ibaad
-                </span>
-                <span className="text-emerald-400 text-xs font-semibold">• زادُ العِباد</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="text-amber-400 text-sm md:text-base font-extrabold tracking-wide drop-shadow-sm">
+                  حملة التكاتف والإيمان (إلى الأبد)
+                </div>
+                <div className="h-0.5 w-[180px] bg-gradient-to-l from-amber-400/80 to-transparent my-1" />
               </div>
-              <h1 className="font-serif text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-l from-white via-stone-100 to-amber-200">
-                متابع الأعمال اليومية
-              </h1>
+              <div className="flex items-baseline gap-2">
+                <h1 className="font-serif text-2xl md:text-2xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-l from-white via-stone-100 to-amber-200">
+                  زاد العباد
+                </h1>
+                <span className="text-emerald-400 text-xs md:text-xs font-semibold tracking-wider font-mono opacity-80 dir-ltr">
+                  — Zad Al-Ibaad
+                </span>
+              </div>
               <p className="text-emerald-300/80 text-xs">
                 متابعة منظمة للصلوات والتعقيبات والأدعية المسـتحبة وتأصيل وردك العبادي.
               </p>
@@ -293,13 +317,15 @@ export default function App() {
                 <ChevronRight className="w-4 h-4" />
               </button>
 
-              <div className="flex-1 sm:flex-initial text-center bg-emerald-900 px-4 py-1.5 rounded-xl border border-emerald-800 min-w-[210px]">
+              <div className="flex-1 sm:flex-initial text-center bg-emerald-900 px-4 py-1.5 rounded-xl border border-emerald-800 min-w-[240px] md:min-w-[280px]">
                 <div className="text-[10px] text-emerald-400 font-bold tracking-wider uppercase flex items-center justify-center gap-1">
                   <CalendarIcon className="w-3 h-3 text-amber-400" />
                   <span>{selectedDateStr}</span>
                 </div>
-                <div className="font-serif font-bold text-stone-100 text-xs mt-0.5">
-                  {formatArabicDate(selectedDateStr)}
+                <div className="font-serif font-bold text-stone-100 text-xs mt-0.5 flex flex-wrap items-center justify-center gap-1.5">
+                  <span>{formatArabicDate(selectedDateStr)}</span>
+                  <span className="text-amber-400/80">•</span>
+                  <span className="text-amber-300">{formatHijriDate(selectedDateStr)}</span>
                 </div>
               </div>
 

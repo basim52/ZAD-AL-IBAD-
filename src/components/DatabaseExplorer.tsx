@@ -449,12 +449,10 @@ class DailyWorkViewModel(private val db: AppDatabase) : ViewModel() {
   const kotlinComposeScreenText = `package com.example.dailyamaal.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
@@ -493,7 +491,7 @@ fun DailyWorksScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("") }, // فارغ لأن العنوان صار في المحتوى
+                title = { Text("") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color(0xFF1B5E20),
                     titleContentColor = Color.White
@@ -515,7 +513,8 @@ fun DailyWorksScreen() {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // ========== ✅ العنوان الكبير والشعار ==========
+
+            // ==================== ✅ العنوان العلوي الكبير ====================
             item {
                 Box(
                     modifier = Modifier
@@ -523,71 +522,72 @@ fun DailyWorksScreen() {
                         .background(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
+                                    Color(0xFF0D3B0F),  // أخضر داكن جداً
                                     Color(0xFF1B5E20),
-                                    Color(0xFF2E7D32),
-                                    Color(0xFF388E3C)
+                                    Color(0xFF2E7D32)
                                 )
                             )
                         )
-                        .padding(vertical = 32.dp, horizontal = 16.dp),
+                        .padding(vertical = 36.dp, horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // العنوان الرئيسي: زاد العباد
+
+                        // ========== حملة التكاتف والإيمان ==========
                         Text(
-                            text = "زاد العباد",
-                            fontSize = 48.sp,
+                            text = "حملة التكاتف والإيمان",
+                            fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
+                            color = Color(0xFFFFD54F), // ذهبي
                             textAlign = TextAlign.Center,
-                            letterSpacing = 4.sp
+                            letterSpacing = 2.sp
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // ========== (إلى الأبد) ==========
+                        Text(
+                            text = "( إلى الأبد )",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFFFD54F).copy(alpha = 0.85f),
+                            textAlign = TextAlign.Center,
+                            letterSpacing = 2.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // خط فاصل مزخرف
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(0.6f)
-                                .height(2.dp)
-                                .background(Color.White.copy(alpha = 0.7f))
+                                .fillMaxWidth(0.5f)
+                                .height(3.dp)
+                                .background(Color(0xFFFFD54F))
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // الشعار: حملة التكاتف والإيمان
+                        // ========== زاد العباد (بخط كبير) ==========
                         Text(
-                            text = "حملة التكاتف والإيمان",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.95f),
+                            text = "زاد العباد",
+                            fontSize = 56.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
                             textAlign = TextAlign.Center,
-                            letterSpacing = 2.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // (إلى الأبد)
-                        Text(
-                            text = "( إلى الأبد )",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFFFFD54F), // لون ذهبي
-                            textAlign = TextAlign.Center,
-                            letterSpacing = 2.sp
+                            letterSpacing = 6.sp
                         )
                     }
                 }
             }
 
-            // ========== بطاقة التاريخ الهجري والميلادي ==========
+            // ==================== ✅ التاريخ الهجري والميلادي ====================
             item {
                 HijriHeader(viewModel)
             }
 
-            // ========== بطاقة تنبيهية للوقت الحالي ==========
+            // ==================== بطاقة تنبيهية للوقت الحالي ====================
             item {
                 Card(
                     modifier = Modifier
@@ -611,7 +611,7 @@ fun DailyWorksScreen() {
                 }
             }
 
-            // ========== قائمة الأعمال حسب الوقت ==========
+            // ==================== قائمة الأعمال حسب الوقت ====================
             val groupedWorks = works.groupBy { it.time }
 
             groupedWorks.forEach { (time, worksInTime) ->
@@ -646,10 +646,12 @@ fun DailyWorksScreen() {
     }
 }
 
+// ==================== ✅ بطاقة التاريخ الهجري والميلادي ====================
 @Composable
 fun HijriHeader(viewModel: DailyWorkViewModel) {
-    val hijriDate = remember { viewModel.getHijriDate() }
-    val occasion = remember { viewModel.getTodayOccasion() }
+    // استدعاء مباشر من ViewModel
+    val hijriDate = viewModel.getHijriDate()
+    val occasion = viewModel.getTodayOccasion()
     val today = java.util.Calendar.getInstance()
 
     Card(
@@ -659,12 +661,15 @@ fun HijriHeader(viewModel: DailyWorkViewModel) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // التاريخ الهجري
             Text(
                 text = "📅 \$hijriDate",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 22.sp
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            // التاريخ الميلادي
             Text(
                 text = "الموافق: \${today.get(java.util.Calendar.DAY_OF_MONTH)}/\${today.get(java.util.Calendar.MONTH) + 1}/\${today.get(java.util.Calendar.YEAR)}",
                 color = Color.White.copy(alpha = 0.8f),
@@ -673,6 +678,7 @@ fun HijriHeader(viewModel: DailyWorkViewModel) {
         }
     }
 
+    // بطاقة المناسبة (تظهر فقط في المناسبات)
     if (occasion.isNotEmpty()) {
         Card(
             modifier = Modifier
@@ -691,6 +697,7 @@ fun HijriHeader(viewModel: DailyWorkViewModel) {
     }
 }
 
+// ==================== ✅ بطاقة العمل اليومي ====================
 @Composable
 fun DailyWorkCard(
     work: DailyWorkEntity,

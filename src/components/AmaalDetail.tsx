@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DailyWork } from '../types';
 import { 
-  X, Type, Copy, CheckCircle2, RotateCcw, Plus, Check, Edit3, Trash2
+  X, Type, Copy, CheckCircle2, RotateCcw, Plus, Check, Edit3, Trash2, Image, Download
 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface AmaalDetailProps {
   work: DailyWork;
@@ -23,6 +24,39 @@ export default function AmaalDetail({
   const [counter, setCounter] = useState<number>(0);
   const [targetCount, setTargetCount] = useState<number>(33); // default Islamic counting goal
   const [copied, setCopied] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  const handleExportImage = () => {
+    if (!exportRef.current) return;
+    setIsExporting(true);
+    
+    // Tiny timeout to ensure style updates are completed
+    setTimeout(() => {
+      toPng(exportRef.current!, {
+        cacheBust: true,
+        backgroundColor: '#022c22', // deep emerald green
+        width: 600,
+        height: 600,
+        style: {
+          transform: 'scale(1)',
+          opacity: '1',
+          visibility: 'visible',
+        }
+      })
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = `${work.title}.png`;
+          link.href = dataUrl;
+          link.click();
+          setIsExporting(false);
+        })
+        .catch((err) => {
+          console.error('Error exporting image:', err);
+          setIsExporting(false);
+        });
+    }, 200);
+  };
 
   const incrementCounter = () => {
     // Vibrate device if supported
@@ -134,14 +168,33 @@ export default function AmaalDetail({
             </div>
 
             {/* Prompt Actions */}
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 id="copy-text-btn"
                 onClick={handleCopy}
-                className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-100 transition-colors"
+                className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
               >
                 <Copy className="w-3.5 h-3.5" />
                 <span>{copied ? 'تم النسخ!' : 'نسخ النص'}</span>
+              </button>
+
+              <button
+                id="export-image-btn"
+                onClick={handleExportImage}
+                disabled={isExporting}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold rounded-lg border border-amber-300 bg-amber-50 text-amber-950 shadow-sm hover:bg-amber-100 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isExporting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-amber-950 border-t-transparent rounded-full animate-spin" />
+                    <span>جاري التحضير...</span>
+                  </>
+                ) : (
+                  <>
+                    <Image className="w-3.5 h-3.5 text-amber-900" />
+                    <span>تصدير كصورة</span>
+                  </>
+                )}
               </button>
 
               {work.isCustom && (
@@ -271,6 +324,63 @@ export default function AmaalDetail({
             </div>
           </div>
           
+        </div>
+      </div>
+
+      {/* Hidden Premium Islamic Card for Shareable Image Export */}
+      <div className="absolute top-0 left-0 pointer-events-none opacity-0 select-none overflow-hidden" style={{ zIndex: -100, width: '0px', height: '0px' }}>
+        <div 
+          ref={exportRef}
+          className="w-[600px] p-8 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 font-sans relative text-right flex flex-col justify-between"
+          style={{ minHeight: '600px', width: '600px' }}
+          dir="rtl"
+        >
+          {/* Decorative Islamic Background Pattern Elements */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.08)_0%,transparent_70%)] pointer-events-none" />
+          
+          {/* Main Golden Double Border */}
+          <div className="absolute inset-6 border-4 border-double border-amber-400/80 rounded-xl pointer-events-none" />
+          
+          {/* Header */}
+          <div className="relative z-10 text-center border-b border-amber-400/30 pb-4 mb-4 mt-4">
+            <span className="text-amber-400 font-extrabold text-xs tracking-widest uppercase">
+              حملة التكاتف والإيمان (إلى الأبد)
+            </span>
+            <div className="h-0.5 w-1/3 mx-auto bg-gradient-to-r from-transparent via-amber-400/60 to-transparent my-1" />
+            <div className="text-white text-3xl font-serif font-bold mt-1 tracking-wider">
+              زاد العباد
+            </div>
+            <div className="text-emerald-300 text-[10px] font-mono tracking-wider">
+              — Zad Al-Ibaad —
+            </div>
+          </div>
+
+          {/* Body content */}
+          <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4">
+            <span className="px-3 py-1 bg-amber-400 text-emerald-950 font-bold text-xs rounded-full shadow-sm mb-3">
+              {work.type} • {work.time}
+            </span>
+            
+            <h2 className="font-serif font-extrabold text-2xl text-amber-300 tracking-wide mb-4 text-center leading-tight drop-shadow-md">
+              {work.title}
+            </h2>
+
+            <div className="w-full bg-white border border-amber-200 shadow-xl rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+              <p className="font-serif text-emerald-950 font-bold text-lg leading-relaxed whitespace-pre-line text-center max-w-md">
+                {work.content || work.description}
+              </p>
+            </div>
+          </div>
+
+          {/* Footer Card Ornament */}
+          <div className="relative z-10 text-center pt-4 mt-4 border-t border-amber-400/20 flex items-center justify-between text-amber-400/80 text-xs px-2 mb-4">
+            <span className="font-mono text-[9px] text-emerald-300/60">Zad Al-Ibaad App</span>
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              <span className="font-serif font-bold">متابع الأعمال العبادية اليومية</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
