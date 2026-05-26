@@ -8,7 +8,7 @@ interface AmaalFormProps {
   editingWork?: DailyWork | null;
 }
 
-const TYPES: AmaalType[] = ['صلاة', 'دعاء', 'زيارة', 'تعقيب', 'عام'];
+const TYPES: AmaalType[] = ['صلاة', 'نافلة', 'دعاء', 'زيارة', 'تعقيب', 'ملخص', 'عام'];
 const TIMES: AmaalTime[] = ['الفجر', 'الصباح', 'الظهر', 'العصر', 'المغرب', 'العشاء', 'الليل'];
 
 export default function AmaalForm({ onClose, onSave, editingWork }: AmaalFormProps) {

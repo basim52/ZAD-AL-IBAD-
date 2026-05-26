@@ -1,4 +1,4 @@
-export type AmaalType = 'صلاة' | 'دعاء' | 'زيارة' | 'تعقيب' | 'عام';
+export type AmaalType = 'صلاة' | 'دعاء' | 'زيارة' | 'تعقيب' | 'عام' | 'نافلة' | 'ملخص';
 
 export type AmaalTime = 'الفجر' | 'الظهر' | 'العصر' | 'المغرب' | 'العشاء' | 'الليل' | 'الصباح';
 
@@ -37,3 +37,39 @@ export interface AmaalState {
   history: Record<string, string[]>; // date string -> array of completed IDs
   streak: number;
 }
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  timeStr: string; // "04:30"
+  advanceMinutes: number; // minutes to warn before
+  enabled: boolean;
+  message: string;
+}
+
+export interface NotificationSettings {
+  fajrReminder: boolean;
+  dhuhrReminder: boolean;
+  asrReminder: boolean;
+  maghribReminder: boolean;
+  ishaReminder: boolean;
+  nightPrayerReminder: boolean;
+  occasionReminder: boolean;
+  dailyReset: boolean;
+  
+  // Custom configured hours/minutes & advance timers
+  fajrTime: string;
+  dhuhrTime: string;
+  asrTime: string;
+  maghribTime: string;
+  ishaTime: string;
+  nightPrayerTime: string;
+  occasionTime: string;
+
+  fajrAdvance: number;
+  dhuhrAdvance: number;
+  asrAdvance: number;
+  maghribAdvance: number;
+  ishaAdvance: number;
+}
+

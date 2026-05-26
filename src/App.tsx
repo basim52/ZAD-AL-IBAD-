@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { DailyWork, AmaalState } from './types';
+import { DailyWork, AmaalState, NotificationSettings } from './types';
 import { DEFAULT_AMAAL } from './data/defaultAmaal';
 import AmaalList from './components/AmaalList';
 import AmaalDetail from './components/AmaalDetail';
 import AmaalForm from './components/AmaalForm';
 import StatsDashboard from './components/StatsDashboard';
+import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from './components/RemindersManager';
 import { 
-  Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse
+  Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2
 } from 'lucide-react';
 
 // Helper to safely get local date string YYYY-MM-DD
@@ -14,6 +15,66 @@ const getLocalDateString = (d: Date = new Date()) => {
   const offset = d.getTimezoneOffset();
   const localDate = new Date(d.getTime() - (offset * 60 * 1000));
   return localDate.toISOString().split('T')[0];
+};
+
+// Advanced Hijri converter and occasion mapper based on astronomy algorithm
+const getHijriDateAndOccasion = (dateStr: string) => {
+  try {
+    const today = new Date(dateStr);
+    const day = today.getDate();
+    const month = today.getMonth() + 1;
+    const year = today.getFullYear();
+
+    // تعديل الانحراف للتاريخ الهجري تماشياً مع رؤية الهلال (اليوم 9 ذو الحجة وليس 11)
+    const hijriOffset = -2;
+    const jd = Math.floor((1461 * (year + 4800 + Math.floor((month - 14) / 12))) / 4) +
+               Math.floor((367 * (month - 2 - 12 * Math.floor((month - 14) / 12))) / 12) -
+               Math.floor((3 * Math.floor((year + 4900 + Math.floor((month - 14) / 12)) / 100)) / 4) +
+               day - 32075 + hijriOffset;
+
+    const l = jd - 1948440 + 10632;
+    const n = Math.floor((l - 1) / 10631);
+    const l2 = l - 10631 * n + 354;
+    const j = Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) + Math.floor(l2 / 5670) * Math.floor((43 * l2) / 15238);
+    const l3 = l2 - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) - Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
+
+    const hijriMonth = Math.floor((24 * l3) / 709);
+    const hijriDay = Math.floor(l3 - Math.floor((709 * hijriMonth) / 24));
+    const hijriYear = Math.floor(30 * n + j - 30);
+
+    const occasions: Record<string, string> = {
+      "1-10": "ذكرى عاشوراء الأليمة 🖤",
+      "7-27": "المبعث النبوي الشريف ✨",
+      "8-3": "ولادة الإمام الحسين عليه السلام 🎉",
+      "8-15": "ولادة الإمام المهدي عجل الله فرجه (١٥ شعبان) 🌟",
+      "9-21": "ذكرى استشهاد الإمام أمير المؤمنين علي عليه السلام 🖤",
+      "12-9": "يوم عرفة المبارك 🕋",
+      "12-10": "عيد الأضحى المبارك 🐑",
+      "12-18": "عيد الغدير الأغر المبارك 👑"
+    };
+
+    const key = `${hijriMonth}-${hijriDay}`;
+    const occasion = occasions[key] || "";
+
+    const months = [
+      "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
+      "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
+      "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
+    ];
+
+    const hijriMonthName = (hijriMonth >= 1 && hijriMonth <= 12) ? months[hijriMonth - 1] : "";
+
+    return {
+      hijriDay,
+      hijriMonth,
+      hijriMonthName,
+      hijriYear,
+      occasion,
+      formatted: `${hijriDay} ${hijriMonthName} ${hijriYear} هـ`
+    };
+  } catch (e) {
+    return null;
+  }
 };
 
 const LOCAL_STORAGE_KEY = 'daily_amaal_app_state_v1';
@@ -26,13 +87,17 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'stats'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'stats' | 'reminders'>('schedule');
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingWork, setEditingWork] = useState<DailyWork | null>(null);
 
   // Clock state for beautiful header time display
   const [currentTime, setCurrentTime] = useState<string>('');
+
+  // Notification and toast state
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+  const [activeToast, setActiveToast] = useState<{ title: string; text: string } | null>(null);
 
   // 1. Load initial state from LocalStorage on mount
   useEffect(() => {
@@ -64,10 +129,149 @@ export default function App() {
       setHistory({});
     }
 
+    // Load notification settings
+    const savedSettings = localStorage.getItem('daily_amaal_notification_settings_v1');
+    if (savedSettings) {
+      try {
+        setNotificationSettings(JSON.parse(savedSettings));
+      } catch (e) {
+        setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
+      }
+    }
+
+    // Check reminders matching current hour/minute
+    const checkReminders = (now: Date) => {
+      const dateKey = getLocalDateString(now);
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const hhmm = `${hh}:${mm}`;
+
+      const storedSettingsStr = localStorage.getItem('daily_amaal_notification_settings_v1');
+      const settings: NotificationSettings = storedSettingsStr ? JSON.parse(storedSettingsStr) : DEFAULT_NOTIFICATION_SETTINGS;
+
+      const storedTriggered = localStorage.getItem('daily_amaal_triggered_reminders_v1');
+      const triggered: Record<string, string[]> = storedTriggered ? JSON.parse(storedTriggered) : {};
+      const todayTriggeredList = triggered[dateKey] || [];
+
+      // Helper to calculate target trigger hh:mm
+      const getTriggerTime = (timeStr: string, advanceMins: number) => {
+        try {
+          const [h, m] = timeStr.split(':').map(Number);
+          const minutesTotal = h * 60 + m - advanceMins;
+          let finalMin = minutesTotal % 60;
+          let finalHour = Math.floor(minutesTotal / 60);
+          if (finalMin < 0) {
+            finalMin += 60;
+            finalHour -= 1;
+          }
+          if (finalHour < 0) {
+            finalHour += 24;
+          }
+          return `${String(finalHour).padStart(2, '0')}:${String(finalMin).padStart(2, '0')}`;
+        } catch {
+          return timeStr;
+        }
+      };
+
+      const triggerReminder = (id: string, title: string, msg: string) => {
+        if (todayTriggeredList.includes(id)) return;
+        
+        todayTriggeredList.push(id);
+        triggered[dateKey] = todayTriggeredList;
+        localStorage.setItem('daily_amaal_triggered_reminders_v1', JSON.stringify(triggered));
+        
+        // Play Chime sound
+        playSereneChime();
+        
+        // Desktop Browser Notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification(title, {
+              body: msg,
+              icon: '/favicon.ico',
+              dir: 'rtl'
+            });
+          } catch (err) {
+            console.error("Browser notification error:", err);
+          }
+        }
+
+        // Trigger App Toast
+        setActiveToast({ title, text: msg });
+        setTimeout(() => {
+          setActiveToast(null);
+        }, 12000);
+      };
+
+      // 1. Fajr Reminder
+      if (settings.fajrReminder) {
+        const target = getTriggerTime(settings.fajrTime, settings.fajrAdvance);
+        if (hhmm === target) {
+          triggerReminder('fajr', '🕌 صلاة الفجر', 'حان وقت صلاة الفجر. قال تعالى: (وقرآن الفجر إن قرآن الفجر كان مشهوداً). لا تنسَ نافلة الفجر.');
+        }
+      }
+
+      // 2. Dhuhr Reminder
+      if (settings.dhuhrReminder) {
+        const target = getTriggerTime(settings.dhuhrTime, settings.dhuhrAdvance);
+        if (hhmm === target) {
+          triggerReminder('dhuhr', '🕌 صلاة الظهر', 'حان وقت صلاة الظهر. لا تنسَ نافلة الظهر (٨ ركعات) قبل الفريضة لزيادة الرزق.');
+        }
+      }
+
+      // 3. Asr Reminder
+      if (settings.asrReminder) {
+        const target = getTriggerTime(settings.asrTime, settings.asrAdvance);
+        if (hhmm === target) {
+          triggerReminder('asr', '🕌 صلاة العصر', 'حان وقت صلاة العصر. وعن الصادق عليه السلام: نافلة العصر تفتح أبواب السماء.');
+        }
+      }
+
+      // 4. Maghrib Reminder
+      if (settings.maghribReminder) {
+        const target = getTriggerTime(settings.maghribTime, settings.maghribAdvance);
+        if (hhmm === target) {
+          triggerReminder('maghrib', '🕌 صلاة المغرب', 'حان وقت صلاة المغرب. لا تنسَ نافلة المغرب (٤ ركعات) بعد الفريضة المباركة.');
+        }
+      }
+
+      // 5. Isha Reminder
+      if (settings.ishaReminder) {
+        const target = getTriggerTime(settings.ishaTime, settings.ishaAdvance);
+        if (hhmm === target) {
+          triggerReminder('isha', '🕌 صلاة العشاء', 'حان وقت صلاة العشاء. لا تنسَ صلاة الوتيرة (نافلة العشاء جلوساً) لدفع وحشة القبر.');
+        }
+      }
+
+      // 6. Night Prayer Reminder (صلاة الليل)
+      if (settings.nightPrayerReminder && hhmm === settings.nightPrayerTime) {
+        triggerReminder('nightPrayer', '🌙 صلاة الليل وقيام السحر', 'وقت السحر وصلاة الليل. قال الإمام الصادق (ع): صلاة الليل تزيد في الرزق وتحسن الوجه والمزاج (١١ ركعة).');
+      }
+
+      // 7. Occasions Reminder
+      if (settings.occasionReminder && hhmm === settings.occasionTime) {
+        const hijri = getHijriDateAndOccasion(dateKey);
+        if (hijri && hijri.occasion) {
+          triggerReminder('occasion', '🌟 مناسبة اليوم المباركة', `اليوم هو: ${hijri.occasion}. تذكّر الاطّلاع على الأعمال والزيارات المخصوصة لليوم.`);
+        }
+      }
+
+      // 8. Daily Reset at exactly 00:01
+      if (settings.dailyReset && hhmm === "00:01") {
+        if (!todayTriggeredList.includes('dailyResetAction')) {
+          todayTriggeredList.push('dailyResetAction');
+          triggered[dateKey] = todayTriggeredList;
+          localStorage.setItem('daily_amaal_triggered_reminders_v1', JSON.stringify(triggered));
+          triggerReminder('dailyReset', '🔄 إعادة تعيين تلقائية للأعمال', 'تم تصفير حالة الأعمال والتعقيبات وبدء يوم تعبدي جديد مفعم بالإيمان والنشاط.');
+        }
+      }
+    };
+
     // Refresh Time
     const updateTime = () => {
       const now = new Date();
       setCurrentTime(now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      checkReminders(now);
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
@@ -238,6 +442,10 @@ export default function App() {
 
   // Helper to format Hijri date
   const formatHijriDate = (dateStr: string) => {
+    const calculated = getHijriDateAndOccasion(dateStr);
+    if (calculated) {
+      return calculated.formatted;
+    }
     try {
       const date = new Date(dateStr);
       const formatter = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
@@ -274,7 +482,7 @@ export default function App() {
             <div className="space-y-1.5">
               <div className="flex flex-col gap-0.5">
                 <div className="text-amber-400 text-sm md:text-base font-extrabold tracking-wide drop-shadow-sm">
-                  حملة التكاتف والإيمان (إلى الأبد)
+                  حملة التكاتف والإيمان
                 </div>
                 <div className="h-0.5 w-[180px] bg-gradient-to-l from-amber-400/80 to-transparent my-1" />
               </div>
@@ -351,12 +559,36 @@ export default function App() {
             )}
           </div>
 
+          {/* Dynamic Hijri Occasion Banner */}
+          {(() => {
+            const hijriInfo = getHijriDateAndOccasion(selectedDateStr);
+            if (hijriInfo && hijriInfo.occasion) {
+              return (
+                <div className="mt-4 px-4 py-3 bg-gradient-to-r from-amber-500/25 via-amber-400/15 to-emerald-900/40 border border-amber-400/30 rounded-2xl flex items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">✨</span>
+                    <div className="text-right">
+                      <div className="text-[10px] text-amber-300/80 font-bold font-mono">الـمناسبة الهـجرية للـيوم</div>
+                      <div className="text-amber-200 font-serif font-extrabold text-sm sm:text-base tracking-wide drop-shadow-sm">
+                        {hijriInfo.occasion}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] sm:text-xs font-mono font-bold px-2.5 py-1 bg-amber-400 text-emerald-950 rounded-lg shadow-sm">
+                    {hijriInfo.hijriDay} {hijriInfo.hijriMonthName}
+                  </span>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {/* Tab Navigation Switches */}
-          <div className="flex gap-2.5 mt-5">
+          <div className="flex flex-wrap gap-2 md:gap-4 mt-5">
             <button
               id="tab-schedule-btn"
               onClick={() => setActiveTab('schedule')}
-              className={`pb-2 pt-1 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                 activeTab === 'schedule'
                   ? 'border-amber-400 text-amber-400 font-extrabold'
                   : 'border-transparent text-emerald-300/60 hover:text-white'
@@ -367,13 +599,27 @@ export default function App() {
             <button
               id="tab-stats-btn"
               onClick={() => setActiveTab('stats')}
-              className={`pb-2 pt-1 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                 activeTab === 'stats'
                   ? 'border-amber-400 text-amber-400 font-extrabold'
                   : 'border-transparent text-emerald-300/60 hover:text-white'
               }`}
             >
               مؤشرات الالتزام والتقارير
+            </button>
+            <button
+              id="tab-reminders-btn"
+              onClick={() => setActiveTab('reminders')}
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === 'reminders'
+                  ? 'border-amber-400 text-amber-400 font-extrabold'
+                  : 'border-transparent text-emerald-300/60 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Bell className="w-3 h-3 text-amber-300 animate-pulse animate-duration-1000" />
+                <span>تنبيـهات صلاة الرواتب والأوراد</span>
+              </span>
             </button>
           </div>
 
@@ -393,14 +639,27 @@ export default function App() {
                 setEditingWork(null);
                 setIsFormOpen(true);
               }}
+              selectedDateStr={selectedDateStr}
             />
-          ) : (
+          ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 
               history={history} 
               streak={streak} 
               onImportData={handleImportData}
               onClearAllData={handleClearAllData}
+              hijriFormatted={getHijriDateAndOccasion(selectedDateStr)?.formatted}
+              occasion={getHijriDateAndOccasion(selectedDateStr)?.occasion}
+              onToggleComplete={handleToggleComplete}
+            />
+          ) : (
+            <RemindersManager 
+              settings={notificationSettings}
+              onUpdateSettings={(updated) => {
+                setNotificationSettings(updated);
+                localStorage.setItem('daily_amaal_notification_settings_v1', JSON.stringify(updated));
+              }}
+              hijriOccasion={getHijriDateAndOccasion(selectedDateStr)?.occasion || ''}
             />
           )}
         </div>
@@ -457,6 +716,25 @@ export default function App() {
           }}
           onDelete={handleDeleteWork}
         />
+      )}
+
+      {/* 3. Global Notification Alert Toast */}
+      {activeToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] max-w-sm w-[90%] bg-gradient-to-br from-emerald-950 to-emerald-900 border border-amber-300 text-white rounded-2xl shadow-2xl p-4.5 flex gap-3.5 items-start animate-fade-in animate-bounce">
+          <div className="p-2 bg-emerald-800 text-amber-300 rounded-xl">
+            <Bell className="w-5 h-5 animate-pulse" />
+          </div>
+          <div className="space-y-1 text-right flex-1">
+            <h4 className="font-serif font-extrabold text-xs text-amber-300">{activeToast.title}</h4>
+            <p className="text-[11px] text-stone-200 leading-relaxed font-sans">{activeToast.text}</p>
+          </div>
+          <button 
+            className="text-stone-300 hover:text-white font-bold select-none cursor-pointer self-start text-lg"
+            onClick={() => setActiveToast(null)}
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   );

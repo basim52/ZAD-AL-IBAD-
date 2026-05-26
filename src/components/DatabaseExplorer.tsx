@@ -5,7 +5,7 @@ import { MONTHLY_SHABAN_AMAAL } from '../data/monthlyShabanAmaal';
 import { MONTHLY_RAMADAN_AMAAL } from '../data/monthlyRamadanAmaal';
 import { 
   Database, Download, Upload, Trash2, Code, Terminal, Layers, CheckCircle, AlertTriangle,
-  Moon, Sun, Search, Copy, BookOpen, Sparkles, SlidersHorizontal, ArrowLeftRight
+  Moon, Sun, Search, Copy, BookOpen, Sparkles, SlidersHorizontal, ArrowLeftRight, Bell
 } from 'lucide-react';
 
 interface DatabaseExplorerProps {
@@ -21,10 +21,12 @@ export default function DatabaseExplorer({
   onImportData, 
   onClearAllData 
 }: DatabaseExplorerProps) {
-  const [activeTab, setActiveTab] = useState<'entity' | 'dao' | 'viewmodel' | 'compose' | 'activity' | 'utils' | 'sqlite' | 'rajab-amaal' | 'backup'>('entity');
+  const [activeTab, setActiveTab] = useState<'entity' | 'dao' | 'viewmodel' | 'compose' | 'activity' | 'utils' | 'sqlite' | 'rajab-amaal' | 'backup' | 'notifications'>('entity');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<boolean>(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedComposeSubTab, setSelectedComposeSubTab] = useState<'list' | 'summary'>('list');
+  const [selectedUtilsSubTab, setSelectedUtilsSubTab] = useState<'utils' | 'export'>('utils');
 
   // Rajab, Shaban & Ramadan simulated database browser states
   const [selectedMonth, setSelectedMonth] = useState<'رجب' | 'شعبان' | 'رمضان'>('رجب');
@@ -545,18 +547,6 @@ fun DailyWorksScreen() {
                             letterSpacing = 2.sp
                         )
 
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        // ========== (إلى الأبد) ==========
-                        Text(
-                            text = "( إلى الأبد )",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFFFD54F).copy(alpha = 0.85f),
-                            textAlign = TextAlign.Center,
-                            letterSpacing = 2.sp
-                        )
-
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // خط فاصل مزخرف
@@ -781,21 +771,472 @@ fun DailyWorkCard(
     }
 }`;
 
+  const kotlinDailySummaryScreenText = `package com.example.dailyamaal.ui.screens
+
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.widget.Toast
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.room.Room
+import com.example.dailyamaal.data.local.db.AppDatabase
+import com.example.dailyamaal.ui.viewmodel.DailyWorkViewModel
+import java.io.OutputStream
+import java.util.Calendar
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DailySummaryScreen() {
+    val context = LocalContext.current
+    val db = remember {
+        Room.databaseBuilder(context, AppDatabase::class.java, "daily_amaal.db").build()
+    }
+    val viewModel: DailyWorkViewModel = viewModel { DailyWorkViewModel(db) }
+    val works by viewModel.allWorks.collectAsState(initial = emptyList())
+    val hijriDate = viewModel.getHijriDate()
+    val occasion = viewModel.getTodayOccasion()
+    val today = Calendar.getInstance()
+
+    val completedCount = works.count { it.isCompleted }
+    val totalCount = works.size
+    val progressPercent = if (totalCount > 0) (completedCount * 100 / totalCount) else 0
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("📋 موجز الأعمال اليومية") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFF1B5E20),
+                    titleContentColor = Color.White
+                )
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            // ========== بطاقة التاريخ والمناسبة ==========
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2E7D32)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "📅 $hijriDate",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
+                        )
+                        Text(
+                            text = "الموافق: \${today.get(Calendar.DAY_OF_MONTH)}/\${today.get(Calendar.MONTH) + 1}/\${today.get(Calendar.YEAR)}",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 14.sp
+                        )
+                        if (occasion.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "🌟 $occasion",
+                                color = Color(0xFFFFD54F),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ========== بطاقة الإحصائيات ==========
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "📊 إحصائيات اليوم",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF1B5E20)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            StatItem("الأعمال", "\$totalCount")
+                            StatItem("مكتمل", "\$completedCount")
+                            StatItem("متبقي", "\${totalCount - completedCount}")
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // شريط التقدم
+                        LinearProgressIndicator(
+                            progress = { progressPercent / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(12.dp)
+                                .clip(RoundedCornerShape(6.dp)),
+                            color = Color(0xFF4CAF50),
+                            trackColor = Color(0xFFC8E6C9),
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "\$progressPercent% مكتمل",
+                            fontSize = 14.sp,
+                            color = Color(0xFF1B5E20),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            // ========== الأعمال المنجزة وغير المنجزة ==========
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "✅ الأعمال المنجزة (\$completedCount)",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF2E7D32),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            items(works.filter { it.isCompleted }) { work ->
+                SummaryWorkItem(work, isCompleted = true)
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "⏳ أعمال متبقية (\${totalCount - completedCount})",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFFE65100),
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            items(works.filter { !it.isCompleted }) { work ->
+                SummaryWorkItem(work, isCompleted = false)
+            }
+
+            // ========== زر التصدير كصورة ==========
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                Button(
+                    onClick = {
+                        // تعيين تصدير المعطيات كصورة في أجهزة الأندرويد الأساسية
+                        Toast.makeText(context, "جاري تصدير الموجز...", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B5E20)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("📤 تصدير الموجز كصورة", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Color(0xFF1B5E20))
+        Text(text = label, fontSize = 12.sp, color = Color.Gray)
+    }
+}
+
+@Composable
+fun SummaryWorkItem(work: com.example.dailyamaal.data.local.entity.DailyWorkEntity, isCompleted: Boolean) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCompleted) Color(0xFFE8F5E9) else Color(0xFFFFF8E1)
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (isCompleted) Color(0xFF4CAF50) else Color.Gray,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = work.title,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    color = if (isCompleted) Color.Gray else Color.Black
+                )
+                Text(
+                    text = "\${work.type} • \${work.time}",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+        }
+    }
+}`;
+
   const kotlinMainActivityText = `package com.example.dailyamaal
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import com.example.dailyamaal.data.local.NotificationHelper
+import com.example.dailyamaal.data.local.PrayerTimeManager
+import com.example.dailyamaal.ui.screens.DailySummaryScreen
 import com.example.dailyamaal.ui.screens.DailyWorksScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        NotificationHelper.createChannels(this)
+        val prayerManager = PrayerTimeManager(this)
+        prayerManager.scheduleAllPrayerNotifications()
+        prayerManager.scheduleNightPrayerNotification()
+        prayerManager.scheduleDailyReset()
+
         setContent {
-            DailyWorksScreen()
+            var showSummary by remember { mutableStateOf(false) }
+
+            Scaffold(
+                bottomBar = {
+                    NavigationBar {
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            label = { Text("الأعمال") },
+                            selected = !showSummary,
+                            onClick = { showSummary = false }
+                        )
+                        NavigationBarItem(
+                            icon = { Icon(Icons.Default.Summarize, contentDescription = null) },
+                            label = { Text("الموجز") },
+                            selected = showSummary,
+                            onClick = { showSummary = true }
+                        )
+                    }
+                }
+            ) { padding ->
+                Box(modifier = Modifier.padding(padding)) {
+                    if (showSummary) {
+                        DailySummaryScreen()
+                    } else {
+                        DailyWorksScreen()
+                    }
+                }
+            }
         }
     }
 }`;
+
+  const kotlinNotificationHelperText = `package com.example.dailyamaal.data.local
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
+import android.os.Build
+import androidx.core.app.NotificationCompat
+
+class NotificationHelper {
+    companion object {
+        private const val CHANNEL_PRAYER = "prayer_channel"
+        private const val CHANNEL_NIGHT = "night_channel"
+
+        fun createChannels(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                
+                val prayerChannel = NotificationChannel(
+                    CHANNEL_PRAYER, "إشعارات الصلوات", NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "تذكير بالصلوات الخمس"; enableVibration(true) }
+                
+                val nightChannel = NotificationChannel(
+                    CHANNEL_NIGHT, "صلاة الليل", NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "تذكير بصلاة الليل"; enableVibration(true) }
+                
+                manager.createNotificationChannel(prayerChannel)
+                manager.createNotificationChannel(nightChannel)
+            }
+        }
+
+        fun showNotification(context: Context, title: String, message: String, notificationId: Int) {
+            val channelId = if (notificationId == 2001) CHANNEL_NIGHT else CHANNEL_PRAYER
+            val builder = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(notificationId, builder.build())
+        }
+    }
+}`;
+
+  const kotlinPrayerTimeManagerText = `package com.example.dailyamaal.data.local
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import java.util.Calendar
+
+class PrayerTimeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val title = intent.getStringExtra("title") ?: "تنبيه"
+        val message = intent.getStringExtra("message") ?: "حان وقت العمل"
+        val notificationId = intent.getIntExtra("notification_id", 0)
+        NotificationHelper.showNotification(context, title, message, notificationId)
+    }
+}
+
+class DailyResetReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        // سيتم ربطه لاحقاً بقاعدة البيانات لإعادة تعيين الأعمال
+    }
+}
+
+class PrayerTimeManager(private val context: Context) {
+
+    private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    fun scheduleNotification(
+        hour: Int, minute: Int,
+        title: String, message: String,
+        notificationId: Int,
+        advanceMinutes: Int = 10
+    ) {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute - advanceMinutes)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (before(Calendar.getInstance())) add(Calendar.DAY_OF_MONTH, 1)
+        }
+
+        val intent = Intent(context, PrayerTimeReceiver::class.java).apply {
+            putExtra("title", title)
+            putExtra("message", message)
+            putExtra("notification_id", notificationId)
+        }
+
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        alarmManager.cancel(pendingIntent)
+        alarmManager.setRepeating(
+            AlarmManager.RTC_WAKEUP,
+            calendar.timeInMillis,
+            AlarmManager.INTERVAL_DAY,
+            pendingIntent
+        )
+    }
+
+    fun scheduleAllPrayerNotifications() {
+        // الفجر
+        scheduleNotification(4, 30, "🕌 صلاة الفجر", "حان وقت صلاة الفجر والنافلة قبلها", 1001, 15)
+        // الظهر
+        scheduleNotification(12, 0, "🕌 صلاة الظهر", "حان وقت صلاة الظهر. لا تنس نافلة الظهر 8 ركعات", 1002, 10)
+        // العصر
+        scheduleNotification(15, 30, "🕌 صلاة العصر", "حان وقت صلاة العصر. لا تنس نافلة العصر 8 ركعات", 1003, 10)
+        // المغرب
+        scheduleNotification(18, 0, "🕌 صلاة المغرب", "حان وقت صلاة المغرب. نافلة المغرب بعد الفريضة", 1004, 5)
+        // العشاء
+        scheduleNotification(19, 30, "🕌 صلاة العشاء", "حان وقت صلاة العشاء. لا تنس صلاة الوتيرة", 1005, 10)
+    }
+
+    fun scheduleNightPrayerNotification() {
+        scheduleNotification(3, 0, "🌙 صلاة الليل", "وقت السحر. صلاة الليل 11 ركعة تزيد في الرزق", 2001, 0)
+    }
+
+    fun scheduleDailyReset() {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 1)
+            set(Calendar.SECOND, 0)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }
+        val intent = Intent(context, DailyResetReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, 4001, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.setRepeating(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, AlarmManager.INTERVAL_DAY, pendingIntent)
+    }
+}`;
+
+  const kotlinAndroidManifestText = `<!-- 1. أذونات الإشعارات والمنبهات الفورية (Permissions) -->
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+<uses-permission android:name="android.permission.VIBRATE" />
+<uses-permission android:name="android.permission.WAKE_LOCK" />
+
+<!-- 2. مستقبلات البث لاستلام إشارات الصلوات والتصفير اليومي (Receivers inside <application>) -->
+<receiver android:name=".data.local.PrayerTimeReceiver" android:exported="false" />
+<receiver android:name=".data.local.DailyResetReceiver" android:exported="false" />`;
 
   const kotlinUtilsText = `import java.util.Calendar
 import java.util.GregorianCalendar
@@ -846,6 +1287,72 @@ fun getTodayOccasion(hijriMonth: Int, hijriDay: Int): String {
         hijriMonth == 1 && hijriDay == 10 -> "ذكرى عاشوراء"
         // أضف باقي المناسبات
         else -> ""
+    }
+}`;
+
+  const kotlinSummaryExportHelperText = `package com.example.dailyamaal.util
+
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.view.View
+import androidx.core.content.FileProvider
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+
+class SummaryExportHelper(private val context: Context) {
+
+    fun exportViewToImage(view: View): Uri? {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        view.draw(canvas)
+
+        return saveBitmapToGallery(bitmap)
+    }
+
+    private fun saveBitmapToGallery(bitmap: Bitmap): Uri? {
+        val fileName = "موجز_الأعمال_\${System.currentTimeMillis()}.png"
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // أندرويد 10+
+            val contentValues = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/زاد_العباد")
+            }
+            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+            uri?.let {
+                context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                }
+            }
+            uri
+        } else {
+            // أندرويد 9 وما دون
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "زاد_العباد")
+            if (!dir.exists()) dir.mkdirs()
+            val file = File(dir, fileName)
+            FileOutputStream(file).use { outputStream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            }
+            Uri.fromFile(file)
+        }
+    }
+
+    fun shareImage(uri: Uri) {
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/png"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(shareIntent, "مشاركة الموجز عبر"))
     }
 }`;
 
@@ -981,6 +1488,17 @@ ${itemsCode}
           }`}
         >
           الرئيسية (MainActivity)
+        </button>
+        <button
+          onClick={() => setActiveTab('notifications')}
+          className={`px-3 py-1.5 font-bold border-b-2 -mb-[2px] transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5 ${
+            activeTab === 'notifications'
+              ? 'border-emerald-800 text-emerald-850'
+              : 'border-transparent text-stone-400 hover:text-stone-700'
+          }`}
+        >
+          <Bell className="w-3.5 h-3.5" />
+          <span>إشعارات الأندرويد (Notifications)</span>
         </button>
         <button
           onClick={() => setActiveTab('utils')}
@@ -1137,23 +1655,69 @@ ${itemsCode}
         {/* COMPOSE TAB */}
         {activeTab === 'compose' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
-              <span>واجهة المستخدم Jetpack Compose (Kotlin UI Composable):</span>
+            {/* Sub-tabs Selector */}
+            <div className="flex flex-wrap gap-1.5 p-1 bg-stone-100 border border-stone-200 rounded-xl max-w-fit">
               <button
-                onClick={() => copyTextToClipboard('compose', kotlinComposeScreenText)}
+                type="button"
+                onClick={() => setSelectedComposeSubTab('list')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  selectedComposeSubTab === 'list'
+                    ? 'bg-white text-emerald-900 shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                1. قائمة الأوراد (DailyWorksScreen.kt)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedComposeSubTab('summary')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  selectedComposeSubTab === 'summary'
+                    ? 'bg-white text-emerald-900 shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                2. شاشة الموجز الجديدة (DailySummaryScreen.kt)
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
+              <span>
+                {selectedComposeSubTab === 'list'
+                  ? 'واجهة قائمة الأوراد المبوّبة بالـ Jetpack Compose (DailyWorksScreen):'
+                  : 'واجهة ملخص الإنجازات اليومية وبطاقة التصدير بالـ Jetpack Compose (DailySummaryScreen):'}
+              </span>
+              <button
+                onClick={() =>
+                  copyTextToClipboard(
+                    selectedComposeSubTab === 'list' ? 'compose' : 'compose-summary',
+                    selectedComposeSubTab === 'list' ? kotlinComposeScreenText : kotlinDailySummaryScreenText
+                  )
+                }
                 className="text-emerald-850 hover:underline font-serif"
               >
-                {copied === 'compose' ? 'تم نسخ الكود!' : 'نسخ الكود'}
+                {copied === (selectedComposeSubTab === 'list' ? 'compose' : 'compose-summary')
+                  ? 'تم نسخ الكود!'
+                  : 'نسخ الكود'}
               </button>
             </div>
             <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left max-h-[380px]" dir="ltr">
-              {kotlinComposeScreenText}
+              {selectedComposeSubTab === 'list' ? kotlinComposeScreenText : kotlinDailySummaryScreenText}
             </pre>
-            <div className="p-3 bg-teal-50 border border-teal-150 text-[11px] text-teal-900 rounded-lg space-y-1">
-              <span className="font-bold text-teal-950 block">مواءمة واجهة المستخدم الـ (UI Alignment):</span>
-              <p>• تعتمد واجهة Jetpack Compose على تجميع الأوراد حسب أوقات اليوم <code>groupedWorks</code> وعرض عنوان الوقت بشكل مميز (مثل الفجر، الظهر، المغرب، الليل)، وهو ما يتكامل تماماً مع تنظيم وتفريد وعرض مجموعات الأوراد بالويب!</p>
-              <p>• تعتمد واجهة الـ Compose بطاقة <code>DailyWorkCard</code> مجهزة بـ <code>IconButton</code> لإنجاز ودعم التعديل الفوري لحالة الورد، وهو مطابق تماماً للبطاقة الحديثة التفاعلية بموقع الويب.</p>
-            </div>
+
+            {selectedComposeSubTab === 'list' ? (
+              <div className="p-3 bg-teal-50 border border-teal-150 text-[11px] text-teal-900 rounded-lg space-y-1">
+                <span className="font-bold text-teal-950 block">مواءمة واجهة قائمة الأوراد الـ (UI Alignment):</span>
+                <p>• تعتمد واجهة Jetpack Compose على تجميع الأوراد حسب أوقات اليوم <code>groupedWorks</code> وعرض عنوان الوقت بشكل مميز (مثل الفجر، الظهر، المغرب، الليل)، وهو ما يتكامل تماماً مع تنظيم وتفريد وعرض مجموعات الأوراد بالويب!</p>
+                <p>• تعتمد واجهة الـ Compose بطاقة <code>DailyWorkCard</code> مجهزة بـ <code>IconButton</code> لإنجاز ودعم التعديل الفوري لحالة الورد، وهو مطابق تماماً للبطاقة الحديثة التفاعلية بموقع الويب.</p>
+              </div>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-150 text-[11px] text-emerald-900 rounded-lg space-y-1">
+                <span className="font-bold text-emerald-950 block">مبادئ تصميم شاشة الموجز (DailySummaryScreen Design):</span>
+                <p>• تعتمد هذه الشاشة Compose على عرض النسب والإحصائيات وتصنيف الأوراد إلى <strong>منجز (Completed)</strong> بلون أخضر مريح، و<strong>متبقي (Remaining)</strong> بلون ذهبي/برتقالي لتعزيز امتثال ومتابعة المحاسبة الذاتية.</p>
+                <p>• يتضمن الكود زراً لتصدير البطاقة (Export Report as Social Card Image) لمشاركتها مع العائلة أو للتذكير الشخصي، ويتصل مباشرة بـ Room Database لإحضار البيانات المحدثة تلقائياً.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1183,22 +1747,127 @@ ${itemsCode}
         {/* UTILS TAB */}
         {activeTab === 'utils' && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
-              <span>دالة تحديد مسمى الفترة الزمنية الحالية (Kotlin Help Function):</span>
+            {/* Sub-tabs Selector */}
+            <div className="flex flex-wrap gap-1.5 p-1 bg-stone-100 border border-stone-200 rounded-xl max-w-fit">
               <button
-                onClick={() => copyTextToClipboard('utils', kotlinUtilsText)}
-                className="text-emerald-850 hover:underline font-serif"
+                type="button"
+                onClick={() => setSelectedUtilsSubTab('utils')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  selectedUtilsSubTab === 'utils'
+                    ? 'bg-white text-emerald-900 shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
               >
-                {copied === 'utils' ? 'تم نسخ الكود!' : 'نسخ الكود'}
+                1. دوال الهجري والوقت (Utils.kt)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedUtilsSubTab('export')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                  selectedUtilsSubTab === 'export'
+                    ? 'bg-white text-emerald-900 shadow-xs'
+                    : 'text-stone-500 hover:text-stone-800'
+                }`}
+              >
+                2. أداة تصدير الصور والمشاركة (SummaryExportHelper.kt)
               </button>
             </div>
-            <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left text-[10px]" dir="ltr">
-              {kotlinUtilsText}
+
+            <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
+              <span>
+                {selectedUtilsSubTab === 'utils'
+                  ? 'دوال تحديد الفترة الزمنية الحالية وحساب التاريخ الهجري (Utils.kt):'
+                  : 'أداة تصدير شاشات الأندرويد لصور وحفظها في المعرض ومشاركتها (SummaryExportHelper.kt):'}
+              </span>
+              <button
+                onClick={() =>
+                  copyTextToClipboard(
+                    selectedUtilsSubTab === 'utils' ? 'utils' : 'export-helper',
+                    selectedUtilsSubTab === 'utils' ? kotlinUtilsText : kotlinSummaryExportHelperText
+                  )
+                }
+                className="text-emerald-850 hover:underline font-serif"
+              >
+                {copied === (selectedUtilsSubTab === 'utils' ? 'utils' : 'export-helper')
+                  ? 'تم نسخ الكود!'
+                  : 'نسخ الكود'}
+              </button>
+            </div>
+            <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left text-[10px] max-h-[380px]" dir="ltr">
+              {selectedUtilsSubTab === 'utils' ? kotlinUtilsText : kotlinSummaryExportHelperText}
             </pre>
-            <div className="p-3 bg-indigo-50 border border-indigo-150 text-[11px] text-indigo-900 rounded-lg space-y-1">
-              <span className="font-bold text-indigo-950 block">مواءمة الفترات الزمنية للصلوات والأوراد:</span>
-              <p>• تُستعمل الدالة <code>getCurrentTimeLabel</code> للتقسيم الديناميكي الفوري للفترات استنادًا إلى الساعة الحالية من اليوم.</p>
-              <p>• لقد قمنا كذلك بدمج هذا المنطق الذكي في الواجهة الرئيسية للويب لتسليط الضوء بلطف على الفترة الحالية والـ Amaal الموصى بها لهذا الوقت بالذات لتنسجم دقة التصميم وتوجيه المؤمنين بأعلى درجات السلاسة.</p>
+
+            {selectedUtilsSubTab === 'utils' ? (
+              <div className="p-3 bg-indigo-50 border border-indigo-150 text-[11px] text-indigo-900 rounded-lg space-y-1">
+                <span className="font-bold text-indigo-950 block">مواءمة الفترات الزمنية للصلوات والأوراد:</span>
+                <p>• تُستعمل الدالة <code>getCurrentTimeLabel</code> للتقسيم الديناميكي الفوري للفترات استنادًا إلى الساعة الحالية من اليوم.</p>
+                <p>• لقد قمنا كذلك بدمج هذا المنطق الذكي في الواجهة الرئيسية للويب لتسليط الضوء بلطف على الفترة الحالية والـ Amaal الموصى بها لهذا الوقت بالذات لتنسجم دقة التصميم وتوجيه المؤمنين بأعلى درجات السلاسة.</p>
+              </div>
+            ) : (
+              <div className="p-3 bg-emerald-50 border border-emerald-150 text-[11px] text-emerald-900 rounded-lg space-y-1">
+                <span className="font-bold text-emerald-950 block">مبادئ التقاط ومشاركة الإنجازات اليومية:</span>
+                <p>• تدعم فئة <code>SummaryExportHelper</code> تحويل واجهة العرض (View) كلياً لـ <code>Bitmap</code> ورسمها على كائن Canvas، مما يفعل آلية التقاط صورة الموجز بدقة.</p>
+                <p>• متوافقة تماماً مع متطلبات أندرويد 10+ (Android Q) باستخدام <code>MediaStore</code> ومسار حفظ مخصص باسم التطبيق <code>زاد_العباد</code> ليعزز تجربة المستخدمين وبنيتهم التحتية لحفظ التقارير كصورة ومشاركتها مع الأقارب.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* NOTIFICATIONS TAB */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-5">
+            {/* NotificationHelper */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
+                <span>1. منسق قنوات ومصمم الإشعارات المحلّي (NotificationHelper.kt):</span>
+                <button
+                  onClick={() => copyTextToClipboard('helper', kotlinNotificationHelperText)}
+                  className="text-emerald-850 hover:underline font-serif"
+                >
+                  {copied === 'helper' ? 'تم نسخ الكود!' : 'نسخ الكود'}
+                </button>
+              </div>
+              <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left max-h-[220px]" dir="ltr">
+                {kotlinNotificationHelperText}
+              </pre>
+            </div>
+
+            {/* PrayerTimeManager */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
+                <span>2. مدير التنبيهات ومستقبل البث المجدول للصلوات وتصفير الأعمال (PrayerTimeManager.kt):</span>
+                <button
+                  onClick={() => copyTextToClipboard('manager', kotlinPrayerTimeManagerText)}
+                  className="text-emerald-850 hover:underline font-serif"
+                >
+                  {copied === 'manager' ? 'تم نسخ الكود!' : 'نسخ الكود'}
+                </button>
+              </div>
+              <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left max-h-[300px]" dir="ltr">
+                {kotlinPrayerTimeManagerText}
+              </pre>
+            </div>
+
+            {/* Android Manifest Permissions & Receivers */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-[11px] text-stone-550 font-semibold">
+                <span>3. أذونات ومستقبلات ملف التعريف الأساسي (AndroidManifest.xml):</span>
+                <button
+                  onClick={() => copyTextToClipboard('manifest', kotlinAndroidManifestText)}
+                  className="text-emerald-850 hover:underline font-serif"
+                >
+                  {copied === 'manifest' ? 'تم نسخ الكود!' : 'نسخ الكود'}
+                </button>
+              </div>
+              <pre className="p-4 bg-stone-900 text-stone-250 font-mono rounded-xl overflow-x-auto text-[11px] leading-relaxed text-left" dir="ltr">
+                {kotlinAndroidManifestText}
+              </pre>
+            </div>
+
+            <div className="p-3 bg-emerald-50/50 border border-emerald-150 text-[11px] text-emerald-900 rounded-lg space-y-2">
+              <span className="font-bold text-emerald-950 block">مكافئ التنبيهات بالمتصفح (Browser Notification Equivalence):</span>
+              <p>• تعتمد الأكواد أعلاه بالـ Android على نظام <strong>AlarmManager</strong> لإطلاق الـ BroadcastReceivers في دقة تامة وتنبيه المستخدم بمشهد صوتي واهتزاز كامل.</p>
+              <p>• بالمثل، يوظف موقع الويب في شاشة <strong>مفكرة التنبيهات</strong> نظام توقيت محلي فائق الدقة (مستند لـ LocalStorage) لتشغيل رنين سماوي وئيم (Serene Chime) وتنشيط إشعارات سطح المكتب (Desktop Standard Notifications) واللوحات الإرشادية الفورية للتطابق السلس بالمهام!</p>
             </div>
           </div>
         )}

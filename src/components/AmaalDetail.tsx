@@ -27,17 +27,37 @@ export default function AmaalDetail({
   const [isExporting, setIsExporting] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
+  const textContent = work.content || work.description || '';
+  const textLength = textContent.length;
+
+  const getExportFontSize = () => {
+    if (textLength > 1200) return '11.5px';
+    if (textLength > 850) return '12.5px';
+    if (textLength > 550) return '14.5px';
+    if (textLength > 250) return '16.5px';
+    return '18.5px';
+  };
+
+  const getExportLineHeight = () => {
+    if (textLength > 800) return '1.55';
+    return '1.7';
+  };
+
   const handleExportImage = () => {
     if (!exportRef.current) return;
     setIsExporting(true);
     
     // Tiny timeout to ensure style updates are completed
     setTimeout(() => {
-      toPng(exportRef.current!, {
+      const element = exportRef.current!;
+      const actualWidth = element.offsetWidth || 640;
+      const actualHeight = element.offsetHeight || 640;
+
+      toPng(element, {
         cacheBust: true,
         backgroundColor: '#022c22', // deep emerald green
-        width: 600,
-        height: 600,
+        width: actualWidth,
+        height: actualHeight,
         style: {
           transform: 'scale(1)',
           opacity: '1',
@@ -125,6 +145,14 @@ export default function AmaalDetail({
           
           {/* Main Text / Supplication Area */}
           <div className="flex-1 flex flex-col justify-between">
+            {/* Summary Notice for Duas & Ziyarat */}
+            {(work.type === 'دعاء' || work.type === 'زيارة') && (
+              <div className="mb-3 px-4 py-2.5 bg-amber-50 border border-amber-200/70 text-amber-950 text-xs font-bold rounded-xl text-center flex items-center justify-center gap-2 shadow-sm">
+                <span className="text-base">✨</span>
+                <span>الموجود هنا مختصر يمكنك المواصلة خارجاً</span>
+              </div>
+            )}
+
             {/* Font Adjuster Bar */}
             <div className="flex items-center justify-between pb-3 border-b border-stone-200 text-stone-600 mb-4 bg-stone-50/50 sticky top-0">
               <div className="flex items-center gap-2">
@@ -328,11 +356,11 @@ export default function AmaalDetail({
       </div>
 
       {/* Hidden Premium Islamic Card for Shareable Image Export */}
-      <div className="absolute top-0 left-0 pointer-events-none opacity-0 select-none overflow-hidden" style={{ zIndex: -100, width: '0px', height: '0px' }}>
+      <div className="absolute top-0 left-0 pointer-events-none opacity-0 select-none overflow-hidden" style={{ zIndex: -100, width: '640px', height: 'auto' }}>
         <div 
           ref={exportRef}
-          className="w-[600px] p-8 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 font-sans relative text-right flex flex-col justify-between"
-          style={{ minHeight: '600px', width: '600px' }}
+          className="w-[640px] p-8 bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950 font-sans relative text-right flex flex-col justify-between"
+          style={{ minHeight: '640px', width: '640px', height: 'auto' }}
           dir="rtl"
         >
           {/* Decorative Islamic Background Pattern Elements */}
@@ -344,7 +372,7 @@ export default function AmaalDetail({
           {/* Header */}
           <div className="relative z-10 text-center border-b border-amber-400/30 pb-4 mb-4 mt-4">
             <span className="text-amber-400 font-extrabold text-xs tracking-widest uppercase">
-              حملة التكاتف والإيمان (إلى الأبد)
+              حملة التكاتف والإيمان
             </span>
             <div className="h-0.5 w-1/3 mx-auto bg-gradient-to-r from-transparent via-amber-400/60 to-transparent my-1" />
             <div className="text-white text-3xl font-serif font-bold mt-1 tracking-wider">
@@ -356,7 +384,7 @@ export default function AmaalDetail({
           </div>
 
           {/* Body content */}
-          <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4">
+          <div className="relative z-10 flex-1 flex flex-col justify-center items-center px-4 py-3">
             <span className="px-3 py-1 bg-amber-400 text-emerald-950 font-bold text-xs rounded-full shadow-sm mb-3">
               {work.type} • {work.time}
             </span>
@@ -365,9 +393,15 @@ export default function AmaalDetail({
               {work.title}
             </h2>
 
-            <div className="w-full bg-white border border-amber-200 shadow-xl rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-              <p className="font-serif text-emerald-950 font-bold text-lg leading-relaxed whitespace-pre-line text-center max-w-md">
-                {work.content || work.description}
+            <div className="w-full max-w-[500px] bg-white border border-amber-200 shadow-xl rounded-2xl p-7 flex flex-col items-center justify-center text-center my-2">
+              <p 
+                className="font-serif text-emerald-950 font-bold whitespace-pre-line text-center"
+                style={{ 
+                  fontSize: getExportFontSize(), 
+                  lineHeight: getExportLineHeight() 
+                }}
+              >
+                {textContent}
               </p>
             </div>
           </div>
