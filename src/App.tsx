@@ -5,13 +5,17 @@ import AmaalList from './components/AmaalList';
 import AmaalDetail from './components/AmaalDetail';
 import AmaalForm from './components/AmaalForm';
 import StatsDashboard from './components/StatsDashboard';
+import MonthsAmaalExplorer from './components/MonthsAmaalExplorer';
+import SpiritualJournal, { JournalEntry } from './components/SpiritualJournal';
+import MisbahaGrand from './components/MisbahaGrand';
+import AudioAtmosphere from './components/AudioAtmosphere';
 import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from './components/RemindersManager';
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
   LogIn, LogOut, User as UserIcon, Crown
 } from 'lucide-react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, signInWithGoogle, logoutUser } from './firebase';
+import { auth, signInWithGoogle, logoutUser, uploadUserBackup, fetchUserBackup } from './firebase';
 
 // Helper to safely get local date string YYYY-MM-DD
 const getLocalDateString = (d: Date = new Date()) => {
@@ -122,7 +126,8 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'stats' | 'reminders'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'audio' | 'stats' | 'reminders'>('schedule');
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingWork, setEditingWork] = useState<DailyWork | null>(null);
@@ -172,6 +177,14 @@ export default function App() {
       } catch (e) {
         setNotificationSettings(DEFAULT_NOTIFICATION_SETTINGS);
       }
+    }
+
+    // Load spiritual journal entries
+    const savedJournal = localStorage.getItem('spiritual_journal_v1');
+    if (savedJournal) {
+      try {
+        setJournalEntries(JSON.parse(savedJournal));
+      } catch (e) {}
     }
 
     // Check reminders matching current hour/minute
@@ -371,6 +384,106 @@ export default function App() {
     setStreak(calculatedStreak);
   }, [history]);
 
+  // Helper to trigger cloud synchronization when authenticated
+  const triggerCloudBackup = (
+    updatedWorks: DailyWork[],
+    updatedHistory: Record<string, string[]>,
+    updatedStreak: number = streak,
+    updatedSettings: NotificationSettings = notificationSettings,
+    updatedJournal: JournalEntry[] = journalEntries
+  ) => {
+    const userStored = auth.currentUser;
+    if (userStored) {
+      const custom = updatedWorks.filter(w => w.isCustom);
+      const totalRosaryCount = parseInt(localStorage.getItem('grand_misbaha_accumulated_total_v1') || '0', 10);
+      uploadUserBackup(userStored.uid, {
+        history: updatedHistory,
+        streak: updatedStreak,
+        customWorks: custom,
+        settings: updatedSettings,
+        spiritualJournal: updatedJournal,
+        totalRosaryCount
+      }).catch(err => console.error("Cloud backup sync failed:", err));
+    }
+  };
+
+  // 3.5 Cloud Restoration and Initial Sync upon Login
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const syncCloudData = async () => {
+      setIsCloudSyncing(true);
+      try {
+        const cloudData = await fetchUserBackup(user.uid);
+        if (cloudData) {
+          // Found backup on the cloud! Merging state
+          let mergedWorks = [...DEFAULT_AMAAL];
+          if (cloudData.customWorks && Array.isArray(cloudData.customWorks)) {
+            // Remove previous local customs to avoid duplicate entries
+            mergedWorks = mergedWorks.filter(w => !w.isCustom);
+            cloudData.customWorks.forEach((custom: DailyWork) => {
+              if (!mergedWorks.some(w => w.id === custom.id)) {
+                mergedWorks.push({ ...custom, isCustom: true });
+              }
+            });
+          }
+
+          setWorks(mergedWorks);
+          setHistory(cloudData.history || {});
+          
+          if (cloudData.settings) {
+            setNotificationSettings(cloudData.settings);
+            localStorage.setItem('daily_amaal_notification_settings_v1', JSON.stringify(cloudData.settings));
+          }
+
+          if (cloudData.spiritualJournal) {
+            setJournalEntries(cloudData.spiritualJournal);
+            localStorage.setItem('spiritual_journal_v1', JSON.stringify(cloudData.spiritualJournal));
+          }
+
+          if (cloudData.totalRosaryCount !== undefined) {
+            localStorage.setItem('grand_misbaha_accumulated_total_v1', String(cloudData.totalRosaryCount));
+          }
+
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
+            works: mergedWorks.map(w => ({ ...w, isCompleted: false })),
+            history: cloudData.history || {}
+          }));
+
+          setActiveToast({
+            title: '⚡ مزامنة سحابية فائقة',
+            text: 'تمت مزامنة بياناتك واستيراد الأوراد المخصصة وتقرير التزامك بنجاح من السحابة!'
+          });
+        } else {
+          // No backup found on cloud, upload current local state to cloud immediately to preserve progress
+          const custom = works.filter(w => w.isCustom);
+          const totalRosaryCount = parseInt(localStorage.getItem('grand_misbaha_accumulated_total_v1') || '0', 10);
+          await uploadUserBackup(user.uid, {
+            history,
+            streak,
+            customWorks: custom,
+            settings: notificationSettings,
+            spiritualJournal: journalEntries,
+            totalRosaryCount
+          });
+          
+          setActiveToast({
+            title: '☁️ إنشاء نسخة احتياطية',
+            text: 'تم رفع نسخة احتياطية آمنة لأول مرة لبيانات التزامك وأذكارك بنجاح.'
+          });
+        }
+      } catch (err) {
+        console.error("Error restoring cloud data:", err);
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    };
+
+    syncCloudData();
+  }, [user]);
+
   // Save changes helper
   const saveStateToStorage = (updatedWorks: DailyWork[], updatedHistory: Record<string, string[]>) => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
@@ -407,6 +520,7 @@ export default function App() {
     }
 
     saveStateToStorage(updatedWorks, updatedHistory);
+    triggerCloudBackup(updatedWorks, updatedHistory);
   };
 
   // Save / Add / Update Work Handler
@@ -422,6 +536,7 @@ export default function App() {
 
     setWorks(updatedWorks);
     saveStateToStorage(updatedWorks, history);
+    triggerCloudBackup(updatedWorks, history);
   };
 
   // Delete Custom Work
@@ -437,6 +552,29 @@ export default function App() {
     setWorks(updatedWorks);
     setHistory(updatedHistory);
     saveStateToStorage(updatedWorks, updatedHistory);
+    triggerCloudBackup(updatedWorks, updatedHistory);
+  };
+
+  // Spiritual Journal Handlers
+  const handleAddJournalEntry = (newEntry: JournalEntry) => {
+    const updated = [newEntry, ...journalEntries];
+    setJournalEntries(updated);
+    localStorage.setItem('spiritual_journal_v1', JSON.stringify(updated));
+    triggerCloudBackup(works, history, streak, notificationSettings, updated);
+  };
+
+  const handleDeleteJournalEntry = (id: string) => {
+    const updated = journalEntries.filter(en => en.id !== id);
+    setJournalEntries(updated);
+    localStorage.setItem('spiritual_journal_v1', JSON.stringify(updated));
+    triggerCloudBackup(works, history, streak, notificationSettings, updated);
+  };
+
+  const handleUpdateJournalEntry = (updatedEntry: JournalEntry) => {
+    const updated = journalEntries.map(en => en.id === updatedEntry.id ? updatedEntry : en);
+    setJournalEntries(updated);
+    localStorage.setItem('spiritual_journal_v1', JSON.stringify(updated));
+    triggerCloudBackup(works, history, streak, notificationSettings, updated);
   };
 
   // Import Backup Callback
@@ -447,6 +585,7 @@ export default function App() {
       works: importedWorks.map(w => ({ ...w, isCompleted: false })),
       history: importedHistory
     }));
+    triggerCloudBackup(importedWorks, importedHistory);
   };
 
   // Clear or Factory Reset Data Callback
@@ -455,6 +594,7 @@ export default function App() {
     setWorks(DEFAULT_AMAAL);
     setHistory({});
     setStreak(0);
+    triggerCloudBackup(DEFAULT_AMAAL, {}, 0);
   };
 
   // Day navigation controls
@@ -555,16 +695,18 @@ export default function App() {
                   )}
                   
                   <div className="text-right">
-                    <div className="text-[10px] text-stone-200 font-bold max-w-[110px] truncate">
+                    <div className="text-[10px] text-stone-200 font-bold max-w-[110px] truncate w-full">
                       {user.displayName || user.email?.split('@')[0]}
                     </div>
                     {isAdminUser ? (
                       <span className="text-[9px] text-amber-300 font-extrabold flex items-center gap-0.5">
                         <Crown className="w-2.5 h-2.5 fill-amber-300 animate-pulse" />
-                        <span>المدير 👑</span>
+                        <span>المدير (مُزامن سحابياً ☁️)</span>
                       </span>
                     ) : (
-                      <span className="text-[9px] text-emerald-300 font-sans">مُسجّل</span>
+                      <span className="text-[9px] text-emerald-300 font-sans flex items-center gap-0.5">
+                        <span>مُسجّل ومُزامن سحابياً ☁️</span>
+                      </span>
                     )}
                   </div>
 
@@ -684,6 +826,50 @@ export default function App() {
               الأعمال الواجبة والمستـحبّة
             </button>
             <button
+              id="tab-months-btn"
+              onClick={() => setActiveTab('months')}
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === 'months'
+                  ? 'border-amber-400 text-amber-400 font-extrabold'
+                  : 'border-transparent text-emerald-300/60 hover:text-white'
+              }`}
+            >
+              حقيبة الأشهـر الثـلاثة 🌙
+            </button>
+            <button
+              id="tab-journal-btn"
+              onClick={() => setActiveTab('journal')}
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === 'journal'
+                  ? 'border-amber-400 text-amber-400 font-extrabold'
+                  : 'border-transparent text-emerald-300/60 hover:text-white'
+              }`}
+            >
+              مفكرة الخواطر والتدوينات 📝
+            </button>
+            <button
+              id="tab-misbaha-btn"
+              onClick={() => setActiveTab('misbaha')}
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === 'misbaha'
+                  ? 'border-amber-400 text-amber-400 font-extrabold'
+                  : 'border-transparent text-emerald-300/60 hover:text-white'
+              }`}
+            >
+              المسبحة الوردية الكبرى 📿
+            </button>
+            <button
+              id="tab-audio-btn"
+              onClick={() => setActiveTab('audio')}
+              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                activeTab === 'audio'
+                  ? 'border-amber-400 text-amber-400 font-extrabold'
+                  : 'border-transparent text-emerald-300/60 hover:text-white'
+              }`}
+            >
+              المستقر الصوتي والـطمأنينة 🎵
+            </button>
+            <button
               id="tab-stats-btn"
               onClick={() => setActiveTab('stats')}
               className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
@@ -729,6 +915,24 @@ export default function App() {
               selectedDateStr={selectedDateStr}
               isAdminUser={isAdminUser}
             />
+          ) : activeTab === 'months' ? (
+            <MonthsAmaalExplorer 
+              selectedDateStr={selectedDateStr}
+              history={history}
+              onToggleComplete={handleToggleComplete}
+            />
+          ) : activeTab === 'journal' ? (
+            <SpiritualJournal 
+              entries={journalEntries}
+              onAddEntry={handleAddJournalEntry}
+              onDeleteEntry={handleDeleteJournalEntry}
+              onUpdateEntry={handleUpdateJournalEntry}
+              selectedDateStr={selectedDateStr}
+            />
+          ) : activeTab === 'misbaha' ? (
+            <MisbahaGrand />
+          ) : activeTab === 'audio' ? (
+            <AudioAtmosphere />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 
@@ -746,6 +950,7 @@ export default function App() {
               onUpdateSettings={(updated) => {
                 setNotificationSettings(updated);
                 localStorage.setItem('daily_amaal_notification_settings_v1', JSON.stringify(updated));
+                triggerCloudBackup(works, history, streak, updated);
               }}
               hijriOccasion={getHijriDateAndOccasion(selectedDateStr)?.occasion || ''}
             />

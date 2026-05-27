@@ -16,12 +16,49 @@
         }
       },
       "required": ["email", "createdAt"]
+    },
+    "UserSyncData": {
+      "title": "User Sync Data",
+      "description": "Cloud synchronized user state containing history, custom works, and settings",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase authenticated User ID"
+        },
+        "history": {
+          "type": "object",
+          "description": "Year-Month-Day history of completed deeds"
+        },
+        "streak": {
+          "type": "number",
+          "description": "Active devotion streak count"
+        },
+        "customWorks": {
+          "type": "array",
+          "description": "Extra custom works configured by the user"
+        },
+        "settings": {
+          "type": "object",
+          "description": "User's specific notifications configuration parameters"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last updated timestamp for synchronization logic"
+        }
+      },
+      "required": ["uid", "history", "streak", "updatedAt"]
     }
   },
   "firestore": {
     "/admins/{adminId}": {
       "schema": "Admin",
       "description": "Collection of bootstrap admins to enforce premium features access control"
+    },
+    "/users/{userId}": {
+      "schema": "UserSyncData",
+      "description": "Collection containing secure user-specific synchronized parameters"
     }
   }
 }

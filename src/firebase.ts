@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer, setDoc, getDoc } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -9,6 +9,51 @@ const app = initializeApp(firebaseConfig);
 // Initialize Services
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
+
+export interface UserBackup {
+  uid: string;
+  history: Record<string, string[]>;
+  streak: number;
+  customWorks: any[];
+  settings?: any;
+  spiritualJournal?: any[];
+  totalRosaryCount?: number;
+  updatedAt: string;
+}
+
+// Upload active progress to user's personalized Firestore node
+export const uploadUserBackup = async (uid: string, data: Omit<UserBackup, 'uid' | 'updatedAt'>) => {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await setDoc(userDocRef, {
+      uid,
+      history: data.history,
+      streak: data.streak,
+      customWorks: data.customWorks,
+      settings: data.settings || null,
+      spiritualJournal: data.spiritualJournal || [],
+      totalRosaryCount: data.totalRosaryCount || 0,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("Error synchronizing backup to Firestore:", error);
+  }
+};
+
+// Fetch user data from Cloud Firestore
+export const fetchUserBackup = async (uid: string): Promise<UserBackup | null> => {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    const snap = await getDoc(userDocRef);
+    if (snap.exists()) {
+      return snap.data() as UserBackup;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error retrieving backup from Firestore:", error);
+    return null;
+  }
+};
 
 // Providers
 export const googleProvider = new GoogleAuthProvider();
