@@ -8,7 +8,6 @@ import StatsDashboard from './components/StatsDashboard';
 import MonthsAmaalExplorer from './components/MonthsAmaalExplorer';
 import SpiritualJournal, { JournalEntry } from './components/SpiritualJournal';
 import MisbahaGrand from './components/MisbahaGrand';
-import AudioAtmosphere from './components/AudioAtmosphere';
 import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from './components/RemindersManager';
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
@@ -126,7 +125,7 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'audio' | 'stats' | 'reminders'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders'>('schedule');
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -859,17 +858,6 @@ export default function App() {
               المسبحة الوردية الكبرى 📿
             </button>
             <button
-              id="tab-audio-btn"
-              onClick={() => setActiveTab('audio')}
-              className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                activeTab === 'audio'
-                  ? 'border-amber-400 text-amber-400 font-extrabold'
-                  : 'border-transparent text-emerald-300/60 hover:text-white'
-              }`}
-            >
-              المستقر الصوتي والـطمأنينة 🎵
-            </button>
-            <button
               id="tab-stats-btn"
               onClick={() => setActiveTab('stats')}
               className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
@@ -931,8 +919,6 @@ export default function App() {
             />
           ) : activeTab === 'misbaha' ? (
             <MisbahaGrand />
-          ) : activeTab === 'audio' ? (
-            <AudioAtmosphere />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 
