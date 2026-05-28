@@ -12,6 +12,7 @@ import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from
 import QadaTracker from './components/QadaTracker';
 import KhatmahTracker from './components/KhatmahTracker';
 import DuasExplorer from './components/DuasExplorer';
+import HadithExplorer from './components/HadithExplorer';
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
   LogIn, LogOut, User as UserIcon, Crown
@@ -128,7 +129,7 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas' | 'hadiths'>('schedule');
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -848,6 +849,17 @@ export default function App() {
                }`}
              >
                مكتبة الأدعية والزيارات 🕊️
+              </button>
+              <button
+                id="tab-hadiths-btn"
+                onClick={() => setActiveTab('hadiths')}
+                className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  activeTab === 'hadiths'
+                    ? 'border-amber-400 text-amber-400 font-extrabold'
+                    : 'border-transparent text-emerald-300/60 hover:text-white'
+                }`}
+              >
+                الحديث الشريف 🕌
              </button>
              <button
                id="tab-khatmah-btn"
@@ -961,6 +973,8 @@ export default function App() {
             <KhatmahTracker />
           ) : activeTab === 'duas' ? (
             <DuasExplorer />
+          ) : activeTab === 'hadiths' ? (
+            <HadithExplorer />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 
