@@ -12,7 +12,7 @@ import RemindersManager, { DEFAULT_NOTIFICATION_SETTINGS, playSereneChime } from
 import QadaTracker from './components/QadaTracker';
 import KhatmahTracker from './components/KhatmahTracker';
 import DuasExplorer from './components/DuasExplorer';
-import HadithExplorer from './components/HadithExplorer';
+import CardStudio from './components/CardStudio';
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
   LogIn, LogOut, User as UserIcon, Crown
@@ -94,6 +94,7 @@ export default function App() {
   const [works, setWorks] = useState<DailyWork[]>([]);
   const [history, setHistory] = useState<Record<string, string[]>>({});
   const [streak, setStreak] = useState<number>(0);
+  const [deletedDefaultIds, setDeletedDefaultIds] = useState<string[]>([]);
 
   // Authentication State
   const [user, setUser] = useState<User | null>(null);
@@ -129,7 +130,7 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas' | 'hadiths'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas' | 'card-studio'>('schedule');
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -144,6 +145,15 @@ export default function App() {
 
   // 1. Load initial state from LocalStorage on mount
   useEffect(() => {
+    const savedDeletedIds = localStorage.getItem('deleted_default_amaal_ids_v1');
+    let initialDeletedIds: string[] = [];
+    if (savedDeletedIds) {
+      try {
+        initialDeletedIds = JSON.parse(savedDeletedIds);
+        setDeletedDefaultIds(initialDeletedIds);
+      } catch (e) {}
+    }
+
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
       try {
@@ -155,20 +165,23 @@ export default function App() {
         // Merge default works to ensure any new defaults exist, preserving customs
         const mergedWorks = [...parsed.works];
         DEFAULT_AMAAL.forEach(def => {
-          if (!mergedWorks.some(w => w.id === def.id)) {
+          if (!initialDeletedIds.includes(def.id) && !mergedWorks.some(w => w.id === def.id)) {
             mergedWorks.push(def);
           }
         });
 
-        setWorks(mergedWorks);
+        // Filter out any default works that are deleted
+        const activeWorks = mergedWorks.filter(w => !initialDeletedIds.includes(w.id));
+
+        setWorks(activeWorks);
         setHistory(parsed.history || {});
       } catch (e) {
         // Fallback if parsing fails
-        setWorks(DEFAULT_AMAAL);
+        setWorks(DEFAULT_AMAAL.filter(def => !initialDeletedIds.includes(def.id)));
         setHistory({});
       }
     } else {
-      setWorks(DEFAULT_AMAAL);
+      setWorks(DEFAULT_AMAAL.filter(def => !initialDeletedIds.includes(def.id)));
       setHistory({});
     }
 
@@ -393,7 +406,8 @@ export default function App() {
     updatedHistory: Record<string, string[]>,
     updatedStreak: number = streak,
     updatedSettings: NotificationSettings = notificationSettings,
-    updatedJournal: JournalEntry[] = journalEntries
+    updatedJournal: JournalEntry[] = journalEntries,
+    updatedDeletedDefaultIds: string[] = deletedDefaultIds
   ) => {
     const userStored = auth.currentUser;
     if (userStored) {
@@ -403,6 +417,7 @@ export default function App() {
         history: updatedHistory,
         streak: updatedStreak,
         customWorks: custom,
+        deletedDefaultIds: updatedDeletedDefaultIds,
         settings: updatedSettings,
         spiritualJournal: updatedJournal,
         totalRosaryCount
@@ -422,7 +437,11 @@ export default function App() {
         const cloudData = await fetchUserBackup(user.uid);
         if (cloudData) {
           // Found backup on the cloud! Merging state
-          let mergedWorks = [...DEFAULT_AMAAL];
+          let cloudDeletedIds = cloudData.deletedDefaultIds || [];
+          setDeletedDefaultIds(cloudDeletedIds);
+          localStorage.setItem('deleted_default_amaal_ids_v1', JSON.stringify(cloudDeletedIds));
+
+          let mergedWorks = [...DEFAULT_AMAAL].filter(def => !cloudDeletedIds.includes(def.id));
           if (cloudData.customWorks && Array.isArray(cloudData.customWorks)) {
             // Remove previous local customs to avoid duplicate entries
             mergedWorks = mergedWorks.filter(w => !w.isCustom);
@@ -467,6 +486,7 @@ export default function App() {
             history,
             streak,
             customWorks: custom,
+            deletedDefaultIds,
             settings: notificationSettings,
             spiritualJournal: journalEntries,
             totalRosaryCount
@@ -542,8 +562,19 @@ export default function App() {
     triggerCloudBackup(updatedWorks, history);
   };
 
-  // Delete Custom Work
+  // Delete Predefined or Custom Work
   const handleDeleteWork = (id: string) => {
+    const isCustom = works.some(w => w.id === id && w.isCustom);
+    
+    let newDeletedDefaultIds = [...deletedDefaultIds];
+    if (!isCustom) {
+      if (!newDeletedDefaultIds.includes(id)) {
+        newDeletedDefaultIds.push(id);
+      }
+      setDeletedDefaultIds(newDeletedDefaultIds);
+      localStorage.setItem('deleted_default_amaal_ids_v1', JSON.stringify(newDeletedDefaultIds));
+    }
+
     const updatedWorks = works.filter(w => w.id !== id);
     
     // Also remove from all historical log recordings
@@ -555,7 +586,7 @@ export default function App() {
     setWorks(updatedWorks);
     setHistory(updatedHistory);
     saveStateToStorage(updatedWorks, updatedHistory);
-    triggerCloudBackup(updatedWorks, updatedHistory);
+    triggerCloudBackup(updatedWorks, updatedHistory, streak, notificationSettings, journalEntries, newDeletedDefaultIds);
   };
 
   // Spiritual Journal Handlers
@@ -850,19 +881,20 @@ export default function App() {
              >
                مكتبة الأدعية والزيارات 🕊️
               </button>
-              <button
-                id="tab-hadiths-btn"
-                onClick={() => setActiveTab('hadiths')}
+
+             <button
+               id="tab-card-studio-btn"
+                onClick={() => setActiveTab('card-studio')}
                 className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
-                  activeTab === 'hadiths'
+                  activeTab === 'card-studio'
                     ? 'border-amber-400 text-amber-400 font-extrabold'
-                    : 'border-transparent text-emerald-300/60 hover:text-white'
+                    : 'border-transparent text-amber-300/80 hover:text-white'
                 }`}
               >
-                الحديث الشريف 🕌
-             </button>
-             <button
-               id="tab-khatmah-btn"
+                مصمم البطاقات الفاخرة 🎨
+              </button>
+              <button
+                id="tab-khatmah-btn"
                onClick={() => setActiveTab('khatmah')}
                className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                  activeTab === 'khatmah'
@@ -948,6 +980,11 @@ export default function App() {
                 setEditingWork(null);
                 setIsFormOpen(true);
               }}
+              onEdit={(work) => {
+                setEditingWork(work);
+                setIsFormOpen(true);
+              }}
+              onDelete={handleDeleteWork}
               selectedDateStr={selectedDateStr}
               isAdminUser={isAdminUser}
             />
@@ -973,8 +1010,8 @@ export default function App() {
             <KhatmahTracker />
           ) : activeTab === 'duas' ? (
             <DuasExplorer />
-          ) : activeTab === 'hadiths' ? (
-            <HadithExplorer />
+          ) : activeTab === 'card-studio' ? (
+            <CardStudio />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { DailyWork, AmaalType, AmaalTime } from '../types';
 import { 
   Plus, Search, Sun, Sunset, Moon, Sparkles, Filter, CheckSquare, ClipboardList, Eye, Calendar,
-  BookOpen, RotateCcw, ChevronDown, ChevronUp, BookText, Copy, ZoomIn, ZoomOut, Check, HelpCircle
+  BookOpen, RotateCcw, ChevronDown, ChevronUp, BookText, Copy, ZoomIn, ZoomOut, Check, HelpCircle,
+  Edit3, Trash2
 } from 'lucide-react';
 import { DAILY_OUTLINES } from '../data/dailyZiyaratDua';
 
@@ -11,6 +12,8 @@ interface AmaalListProps {
   onToggleComplete: (id: string) => void;
   onSelectWork: (work: DailyWork) => void;
   onOpenAddModal: () => void;
+  onEdit?: (work: DailyWork) => void;
+  onDelete?: (id: string) => void;
   selectedDateStr: string;
   isAdminUser?: boolean;
 }
@@ -75,8 +78,10 @@ export default function AmaalList({
   works, 
   onToggleComplete, 
   onSelectWork, 
-  onOpenAddModal,
-  selectedDateStr,
+  onOpenAddModal, 
+  onEdit,
+  onDelete,
+  selectedDateStr, 
   isAdminUser = false
 }: AmaalListProps) {
   const [search, setSearch] = useState('');
@@ -1021,15 +1026,49 @@ export default function AmaalList({
                   </p>
                   
                   {/* Bottom action panel */}
-                  <div className="flex items-center justify-between pt-1 text-[11px] text-stone-400">
-                    <button
-                      id={`open-reader-btn-${work.id}`}
-                      onClick={() => onSelectWork(work)}
-                      className="flex items-center gap-1 text-emerald-850 font-semibold hover:text-emerald-950 transition-colors"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>{work.content ? 'قراءة النص الكامل' : 'عرض التفاصيل'}</span>
-                    </button>
+                  <div className="flex items-center justify-between pt-1 text-[11px] text-stone-400 flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        id={`open-reader-btn-${work.id}`}
+                        onClick={() => onSelectWork(work)}
+                        className="flex items-center gap-1 text-emerald-850 font-semibold hover:text-emerald-950 transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>{work.content ? 'قراءة النص الكامل' : 'عرض التفاصيل'}</span>
+                      </button>
+
+                      {onEdit && (
+                        <button
+                          id={`edit-btn-${work.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(work);
+                          }}
+                          className="flex items-center gap-1 text-amber-800 font-semibold hover:text-amber-950 transition-colors cursor-pointer"
+                          title="تعديل هذا العمل"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>تعديل</span>
+                        </button>
+                      )}
+
+                      {onDelete && (
+                        <button
+                          id={`delete-btn-${work.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm('هل أنت متأكد من حذف هذا العمل نهائياً من جدولك اليومي؟')) {
+                              onDelete(work.id);
+                            }
+                          }}
+                          className="flex items-center gap-1 text-red-600 font-semibold hover:text-red-800 transition-colors cursor-pointer"
+                          title="حذف هذا العمل"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>حذف</span>
+                        </button>
+                      )}
+                    </div>
 
                     <span className="font-mono text-[9px] text-stone-450 uppercase tracking-widest bg-stone-50 px-1 border border-stone-150 rounded">
                       ID: {work.id.slice(0, 10)}

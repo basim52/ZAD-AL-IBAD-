@@ -15,6 +15,7 @@ export interface UserBackup {
   history: Record<string, string[]>;
   streak: number;
   customWorks: any[];
+  deletedDefaultIds?: string[];
   settings?: any;
   spiritualJournal?: any[];
   totalRosaryCount?: number;
@@ -30,6 +31,7 @@ export const uploadUserBackup = async (uid: string, data: Omit<UserBackup, 'uid'
       history: data.history,
       streak: data.streak,
       customWorks: data.customWorks,
+      deletedDefaultIds: data.deletedDefaultIds || [],
       settings: data.settings || null,
       spiritualJournal: data.spiritualJournal || [],
       totalRosaryCount: data.totalRosaryCount || 0,

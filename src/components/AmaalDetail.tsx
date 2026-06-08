@@ -225,33 +225,31 @@ export default function AmaalDetail({
                 )}
               </button>
 
-              {work.isCustom && (
-                <>
-                  <button
-                    id="edit-custom-btn"
-                    onClick={() => {
-                      if (onEdit) onEdit(work);
-                    }}
-                    className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium border border-amber-300 text-amber-800 hover:bg-amber-50 rounded-lg transition-colors"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>تعديل</span>
-                  </button>
-                  <button
-                    id="delete-custom-btn"
-                    onClick={() => {
-                      if (onDelete && window.confirm('هل أنت متأكد من حذف هذا العمل نهائياً؟')) {
-                        onDelete(work.id);
-                        onClose();
-                      }
-                    }}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>حذف</span>
-                  </button>
-                </>
-              )}
+              <>
+                <button
+                  id="edit-custom-btn"
+                  onClick={() => {
+                    if (onEdit) onEdit(work);
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium border border-amber-300 text-amber-800 hover:bg-amber-50 rounded-lg transition-colors"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>تعديل</span>
+                </button>
+                <button
+                  id="delete-custom-btn"
+                  onClick={() => {
+                    if (onDelete && window.confirm('هل أنت متأكد من حذف هذا العمل نهائياً؟')) {
+                      onDelete(work.id);
+                      onClose();
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>حذف</span>
+                </button>
+              </>
             </div>
           </div>
 
