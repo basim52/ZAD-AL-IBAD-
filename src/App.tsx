@@ -13,6 +13,7 @@ import QadaTracker from './components/QadaTracker';
 import KhatmahTracker from './components/KhatmahTracker';
 import DuasExplorer from './components/DuasExplorer';
 import CardStudio from './components/CardStudio';
+import HadithExplorer from './components/HadithExplorer';
 import { 
   Calendar as CalendarIcon, Clock, ChevronLeft, ChevronRight, Award, Bookmark, ShieldCheck, HeartPulse, Bell, Volume2,
   LogIn, LogOut, User as UserIcon, Crown
@@ -130,7 +131,7 @@ export default function App() {
   
   // Navigation & View States
   const [selectedDateStr, setSelectedDateStr] = useState<string>(getLocalDateString());
-  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas' | 'card-studio'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'months' | 'journal' | 'misbaha' | 'stats' | 'reminders' | 'qada' | 'khatmah' | 'duas' | 'card-studio' | 'hadiths'>('schedule');
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [selectedWork, setSelectedWork] = useState<DailyWork | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -894,7 +895,18 @@ export default function App() {
                 مصمم البطاقات الفاخرة 🎨
               </button>
               <button
-                id="tab-khatmah-btn"
+                id="tab-hadiths-btn"
+                 onClick={() => setActiveTab('hadiths')}
+                 className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                   activeTab === 'hadiths'
+                     ? 'border-amber-400 text-amber-400 font-extrabold'
+                     : 'border-transparent text-emerald-300/60 hover:text-white'
+                 }`}
+               >
+                 دراية الأنوار (حديث اليوم) 📜
+               </button>
+               <button
+                 id="tab-khatmah-btn"
                onClick={() => setActiveTab('khatmah')}
                className={`pb-2 pt-1 px-3 md:px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
                  activeTab === 'khatmah'
@@ -1012,6 +1024,8 @@ export default function App() {
             <DuasExplorer />
           ) : activeTab === 'card-studio' ? (
             <CardStudio />
+          ) : activeTab === 'hadiths' ? (
+            <HadithExplorer />
           ) : activeTab === 'stats' ? (
             <StatsDashboard 
               works={works} 
